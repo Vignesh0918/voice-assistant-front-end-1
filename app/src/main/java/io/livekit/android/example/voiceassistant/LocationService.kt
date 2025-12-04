@@ -114,3 +114,5 @@ class VoiceAssistantLocationService : Service() {
         const val CHANNEL_ID = "LocationServiceChannel"
     }
 }
+
+annotation class LocationService
