@@ -1,8 +1,8 @@
 package io.livekit.android.example.voiceassistant.screen
 
 import android.app.Activity
-import android.content.Context.MEDIA_PROJECTION_SERVICE
-import android.location.Location
+import android.content.Context
+import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,7 +46,6 @@ import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.Visibility
 import androidx.constraintlayout.compose.layoutId
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.android.gms.location.LocationServices
 import io.livekit.android.annotations.Beta
 import io.livekit.android.compose.local.SessionScope
 import io.livekit.android.compose.local.requireRoom
@@ -57,6 +55,7 @@ import io.livekit.android.compose.state.rememberLocalMedia
 import io.livekit.android.compose.state.rememberSession
 import io.livekit.android.compose.state.rememberSessionMessages
 import io.livekit.android.compose.ui.VideoTrackView
+import io.livekit.android.example.voiceassistant.LocationService
 import io.livekit.android.example.voiceassistant.rememberCanAccessLocation
 import io.livekit.android.example.voiceassistant.rememberCanEnableCamera
 import io.livekit.android.example.voiceassistant.rememberCanEnableMic
@@ -66,6 +65,7 @@ import io.livekit.android.example.voiceassistant.ui.ChatBar
 import io.livekit.android.example.voiceassistant.ui.ChatLog
 import io.livekit.android.example.voiceassistant.ui.ControlBar
 import io.livekit.android.example.voiceassistant.viewmodel.VoiceAssistantViewModel
+import io.livekit.android.room.Room
 import io.livekit.android.room.track.screencapture.ScreenCaptureParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -114,25 +114,10 @@ fun VoiceAssistant(
     )
 
     val context = LocalContext.current
-
-    // Fetch Location
-    var locationText by remember { mutableStateOf("Fetching location...") }
     LaunchedEffect(canAccessLocation) {
         if (canAccessLocation) {
-            try {
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                    if (location != null) {
-                        locationText = "Lat: ${location.latitude}, Lon: ${location.longitude}"
-                    } else {
-                        locationText = "Location unavailable"
-                    }
-                }
-            } catch (e: SecurityException) {
-                locationText = "Permission denied"
-            }
-        } else {
-             locationText = "Location permission needed"
+            val intent = Intent(context, LocationService::class.java)
+            context.startService(intent)
         }
     }
 
@@ -146,6 +131,7 @@ fun VoiceAssistant(
             }
 
             val result = session.start()
+            VoiceAssistantScreen.room = session.room
 
             // Handle if the session fails to connect.
             if (result.isFailure) {
@@ -158,6 +144,8 @@ fun VoiceAssistant(
         DisposableEffect(Unit) {
             onDispose {
                 session.end()
+                val intent = Intent(context, LocationService::class.java)
+                context.stopService(intent)
             }
         }
 
@@ -256,7 +244,7 @@ fun VoiceAssistant(
                 onScreenShareClick = {
                     if (!isScreenShareEnabled) {
                         // Screenshare permission needs to be requested each time.
-                        val mediaProjectionManager = context.getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                        val mediaProjectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                         screenSharePermissionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
                     } else {
                         coroutineScope.launch { localMedia.setScreenShareEnabled(false) }
@@ -308,51 +296,28 @@ fun VoiceAssistant(
                     .clip(RoundedCornerShape(8.dp))
                     .alpha(screenShareAlpha)
             )
-
-            // Display Location
-            Box(
-                modifier = Modifier
-                    .layoutId(LAYOUT_ID_LOCATION)
-                    .padding(top = 48.dp)
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = locationText,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
         }
     }
 }
 
-
+private val VoiceAssistantViewModel.room: Room?
 private const val LAYOUT_ID_AGENT = "agentVisualizer"
 private const val LAYOUT_ID_CHAT_LOG = "chatLog"
 private const val LAYOUT_ID_CONTROL_BAR = "controlBar"
 private const val LAYOUT_ID_CHAT_BAR = "chatBar"
 private const val LAYOUT_ID_CAMERA = "camera"
 private const val LAYOUT_ID_SCREENSHARE = "screenshare"
-private const val LAYOUT_ID_LOCATION = "location"
 
 private fun getConstraints(chatVisible: Boolean, cameraVisible: Boolean, screenShareVisible: Boolean) = ConstraintSet {
-    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare, locationBox) = createRefsFor(
+    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare) = createRefsFor(
         LAYOUT_ID_AGENT,
         LAYOUT_ID_CHAT_LOG,
         LAYOUT_ID_CONTROL_BAR,
         LAYOUT_ID_CHAT_BAR,
         LAYOUT_ID_CAMERA,
         LAYOUT_ID_SCREENSHARE,
-        LAYOUT_ID_LOCATION
     )
     val chatTopGuideline = createGuidelineFromTop(0.2f)
-
-    constrain(locationBox) {
-        top.linkTo(parent.top)
-        start.linkTo(parent.start)
-        end.linkTo(parent.end)
-    }
 
     constrain(chatLog) {
         top.linkTo(chatTopGuideline)
@@ -432,4 +397,8 @@ private fun getConstraints(chatVisible: Boolean, cameraVisible: Boolean, screenS
             visibility = if (screenShareVisible) Visibility.Visible else Visibility.Gone
         }
     }
+}
+
+object VoiceAssistantScreen {
+    var room: Room? = null
 }
