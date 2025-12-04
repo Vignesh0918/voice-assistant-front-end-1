@@ -7,6 +7,7 @@ import android.content.Intent
 import android.location.Location
 import android.media.projection.MediaProjectionManager
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -154,6 +155,7 @@ fun VoiceAssistant(
         // Permission removals kill the app, so this is a one-way transition.
         LaunchedEffect(canEnableMic) {
             if (!canEnableMic) {
+                Toast.makeText(context, "Mic permission needed", Toast.LENGTH_SHORT).show()
                 return@LaunchedEffect
             }
 
@@ -161,8 +163,12 @@ fun VoiceAssistant(
             
             // Handle if the session fails to connect.
             if (result.isFailure) {
-                Toast.makeText(context, "Error connecting to the session.", Toast.LENGTH_SHORT).show()
-                onEndCall()
+                val error = result.exceptionOrNull()
+                Log.e("VoiceAssistant", "Connection failed", error)
+                Toast.makeText(context, "Connect Error: ${error?.message}", Toast.LENGTH_LONG).show()
+                // Do not end call immediately, let user see the error
+            } else {
+                Log.d("VoiceAssistant", "Connected to session successfully")
             }
         }
 
@@ -185,17 +191,25 @@ fun VoiceAssistant(
         val isScreenShareEnabled by localMedia::isScreenShareEnabled
 
         LaunchedEffect(canEnableMic, requestedAudio) {
-            session.waitUntilConnected()
-            // Ensure we only try to enable if we have permission
-            if (canEnableMic) {
-                localMedia.setMicrophoneEnabled(requestedAudio)
+            try {
+                session.waitUntilConnected()
+                // Ensure we only try to enable if we have permission
+                if (canEnableMic) {
+                    localMedia.setMicrophoneEnabled(requestedAudio)
+                }
+            } catch (e: Exception) {
+                Log.e("VoiceAssistant", "Failed to enable mic", e)
             }
         }
 
         LaunchedEffect(canEnableVideo, requestedVideo) {
-            session.waitUntilConnected()
-             if (canEnableVideo) {
-                localMedia.setCameraEnabled(requestedVideo)
+            try {
+                session.waitUntilConnected()
+                 if (canEnableVideo) {
+                    localMedia.setCameraEnabled(requestedVideo)
+                }
+            } catch (e: Exception) {
+                Log.e("VoiceAssistant", "Failed to enable video", e)
             }
         }
 
