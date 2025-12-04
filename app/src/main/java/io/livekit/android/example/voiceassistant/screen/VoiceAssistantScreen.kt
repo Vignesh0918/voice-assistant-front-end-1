@@ -109,7 +109,7 @@ fun VoiceAssistant(
     val session = rememberSession(
         tokenSource = viewModel.tokenSource,
         options = SessionOptions(
-            room = viewModel.room
+            room = VoiceAssistantViewModel.room
         )
     )
 
@@ -300,7 +300,6 @@ fun VoiceAssistant(
     }
 }
 
-private val VoiceAssistantViewModel.room: Room?
 private const val LAYOUT_ID_AGENT = "agentVisualizer"
 private const val LAYOUT_ID_CHAT_LOG = "chatLog"
 private const val LAYOUT_ID_CONTROL_BAR = "controlBar"

@@ -8,12 +8,10 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
 import com.google.gson.Gson
 import io.livekit.android.example.voiceassistant.screen.VoiceAssistantScreen
-import io.livekit.android.room.Room
 import io.livekit.android.room.participant.LocalParticipant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
-class VoiceAssistantLocationService : Service() {
+class LocationService : Service() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + job)
 
@@ -33,9 +31,10 @@ class VoiceAssistantLocationService : Service() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, createNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForeground(NOTIFICATION_ID, createNotification())
+        }
         startLocationUpdates()
         return START_STICKY
     }
@@ -92,15 +91,16 @@ class VoiceAssistantLocationService : Service() {
         return null
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun createNotification(): Notification {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Location Service",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Location Service",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Sharing Location")
@@ -114,5 +114,3 @@ class VoiceAssistantLocationService : Service() {
         const val CHANNEL_ID = "LocationServiceChannel"
     }
 }
-
-annotation class LocationService
