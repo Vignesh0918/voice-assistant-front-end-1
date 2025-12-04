@@ -1,9 +1,12 @@
 package io.livekit.android.example.voiceassistant.screen
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.location.Location
 import android.media.projection.MediaProjectionManager
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +50,11 @@ import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.Visibility
 import androidx.constraintlayout.compose.layoutId
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import io.livekit.android.annotations.Beta
 import io.livekit.android.compose.local.SessionScope
 import io.livekit.android.compose.local.requireRoom
@@ -65,7 +74,6 @@ import io.livekit.android.example.voiceassistant.ui.ChatBar
 import io.livekit.android.example.voiceassistant.ui.ChatLog
 import io.livekit.android.example.voiceassistant.ui.ControlBar
 import io.livekit.android.example.voiceassistant.viewmodel.VoiceAssistantViewModel
-import io.livekit.android.room.Room
 import io.livekit.android.room.track.screencapture.ScreenCaptureParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +98,7 @@ fun VoiceAssistantScreen(
     )
 }
 
+@SuppressLint("MissingPermission")
 @OptIn(Beta::class, ExperimentalPermissionsApi::class)
 @Composable
 fun VoiceAssistant(
@@ -114,10 +123,28 @@ fun VoiceAssistant(
     )
 
     val context = LocalContext.current
+    var locationDisplay by remember { mutableStateOf("Waiting for location...") }
+
     LaunchedEffect(canAccessLocation) {
         if (canAccessLocation) {
+            // Start the background service for backend updates
             val intent = Intent(context, LocationService::class.java)
             context.startService(intent)
+
+            // Also start a local listener to update the UI
+            val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+            val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+                .build()
+            
+            val locationCallback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.lastLocation?.let { location ->
+                        locationDisplay = "Lat: ${location.latitude}\nLon: ${location.longitude}"
+                    }
+                }
+            }
+            
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         }
     }
 
@@ -131,8 +158,7 @@ fun VoiceAssistant(
             }
 
             val result = session.start()
-            VoiceAssistantScreen.room = session.room
-
+            
             // Handle if the session fails to connect.
             if (result.isFailure) {
                 Toast.makeText(context, "Error connecting to the session.", Toast.LENGTH_SHORT).show()
@@ -160,12 +186,17 @@ fun VoiceAssistant(
 
         LaunchedEffect(canEnableMic, requestedAudio) {
             session.waitUntilConnected()
-            localMedia.setMicrophoneEnabled(canEnableMic && requestedAudio)
+            // Ensure we only try to enable if we have permission
+            if (canEnableMic) {
+                localMedia.setMicrophoneEnabled(requestedAudio)
+            }
         }
 
         LaunchedEffect(canEnableVideo, requestedVideo) {
             session.waitUntilConnected()
-            localMedia.setCameraEnabled(canEnableVideo && requestedVideo)
+             if (canEnableVideo) {
+                localMedia.setCameraEnabled(requestedVideo)
+            }
         }
 
         // SessionMessages handles all transcriptions and chat messages
@@ -296,6 +327,21 @@ fun VoiceAssistant(
                     .clip(RoundedCornerShape(8.dp))
                     .alpha(screenShareAlpha)
             )
+
+            // Location Display Box
+            Box(
+                modifier = Modifier
+                    .layoutId(LAYOUT_ID_LOCATION)
+                    .padding(top = 48.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = locationDisplay,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
@@ -306,17 +352,26 @@ private const val LAYOUT_ID_CONTROL_BAR = "controlBar"
 private const val LAYOUT_ID_CHAT_BAR = "chatBar"
 private const val LAYOUT_ID_CAMERA = "camera"
 private const val LAYOUT_ID_SCREENSHARE = "screenshare"
+private const val LAYOUT_ID_LOCATION = "location"
 
 private fun getConstraints(chatVisible: Boolean, cameraVisible: Boolean, screenShareVisible: Boolean) = ConstraintSet {
-    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare) = createRefsFor(
+    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare, locationBox) = createRefsFor(
         LAYOUT_ID_AGENT,
         LAYOUT_ID_CHAT_LOG,
         LAYOUT_ID_CONTROL_BAR,
         LAYOUT_ID_CHAT_BAR,
         LAYOUT_ID_CAMERA,
         LAYOUT_ID_SCREENSHARE,
+        LAYOUT_ID_LOCATION
     )
     val chatTopGuideline = createGuidelineFromTop(0.2f)
+
+    // Position the location box at the top center
+    constrain(locationBox) {
+        top.linkTo(parent.top)
+        start.linkTo(parent.start)
+        end.linkTo(parent.end)
+    }
 
     constrain(chatLog) {
         top.linkTo(chatTopGuideline)
@@ -396,8 +451,4 @@ private fun getConstraints(chatVisible: Boolean, cameraVisible: Boolean, screenS
             visibility = if (screenShareVisible) Visibility.Visible else Visibility.Gone
         }
     }
-}
-
-object VoiceAssistantScreen {
-    var room: Room? = null
 }

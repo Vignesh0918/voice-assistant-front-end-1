@@ -21,7 +21,10 @@ class VoiceAssistantViewModel(application: Application, savedStateHandle: SavedS
     init {
         val (sandboxId, url, token) = savedStateHandle.toRoute<VoiceAssistantRoute>()
 
-        room = LiveKit.create(application)
+        if (room == null) {
+            room = LiveKit.create(application)
+        }
+
         tokenSource = if (sandboxId.isNotEmpty()) {
             TokenSource.fromSandboxTokenServer(sandboxId = sandboxId).cached()
         } else {
@@ -33,6 +36,7 @@ class VoiceAssistantViewModel(application: Application, savedStateHandle: SavedS
         super.onCleared()
         room?.disconnect()
         room?.release()
+        room = null
     }
 
     companion object {

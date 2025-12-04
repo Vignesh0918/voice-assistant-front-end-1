@@ -1,4 +1,3 @@
-
 package io.livekit.android.example.voiceassistant
 
 import android.app.Notification
@@ -7,12 +6,16 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
 import com.google.gson.Gson
-import io.livekit.android.example.voiceassistant.screen.VoiceAssistantScreen
-import io.livekit.android.room.participant.LocalParticipant
+import io.livekit.android.example.voiceassistant.viewmodel.VoiceAssistantViewModel
+import io.livekit.android.room.track.DataPublishReliability
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +25,7 @@ import java.nio.charset.StandardCharsets
 class LocationService : Service() {
     private val job = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + job)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
@@ -29,9 +33,11 @@ class LocationService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        Log.d(TAG, "LocationService created")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(TAG, "LocationService started")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForeground(NOTIFICATION_ID, createNotification())
         }
@@ -40,16 +46,16 @@ class LocationService : Service() {
     }
 
     private fun startLocationUpdates() {
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10000)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
             .setWaitForAccurateLocation(false)
-            .setMinUpdateIntervalMillis(5000)
-            .setMaxUpdateDelayMillis(10000)
+            .setMinUpdateIntervalMillis(2000)
+            .setMaxUpdateDelayMillis(5000)
             .build()
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 locationResult.lastLocation?.let { location ->
-                    val room = VoiceAssistantScreen.room
+                    val room = VoiceAssistantViewModel.room
                     if (room != null) {
                         val locationData = mapOf(
                             "latitude" to location.latitude,
@@ -57,26 +63,39 @@ class LocationService : Service() {
                         )
                         val locationJson = Gson().toJson(locationData)
                         scope.launch {
-                            room.localParticipant.publishData(
-                                locationJson.toByteArray(StandardCharsets.UTF_8),
-                                "location"
-                            )
+                            try {
+                                room.localParticipant.publishData(
+                                    data = locationJson.toByteArray(StandardCharsets.UTF_8),
+                                    topic = "location",
+                                    reliability = DataPublishReliability.RELIABLE
+                                )
+                                Log.d(TAG, "Published location: ${location.latitude}, ${location.longitude}")
+                                
+                                // Show Toast on Main Thread
+                                mainHandler.post {
+                                    Toast.makeText(
+                                        applicationContext, 
+                                        "Location sent to the backend successfully", 
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                                
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error publishing location", e)
+                            }
                         }
+                    } else {
+                        Log.w(TAG, "Room is null, cannot publish location")
                     }
                 }
-            }
-
-            private fun LocalParticipant.publishData(
-                data: ByteArray,
-                reliability: String
-            ) {
             }
         }
 
         try {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, mainLooper)
+            Log.d(TAG, "Requesting location updates")
         } catch (e: SecurityException) {
-            // This should not happen if permissions are handled correctly in the UI
+            Log.e(TAG, "Permission denied for location updates", e)
         }
     }
 
@@ -85,6 +104,7 @@ class LocationService : Service() {
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
         job.cancel()
+        Log.d(TAG, "LocationService destroyed")
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -112,5 +132,6 @@ class LocationService : Service() {
     companion object {
         const val NOTIFICATION_ID = 101
         const val CHANNEL_ID = "LocationServiceChannel"
+        const val TAG = "LocationService"
     }
 }

@@ -1,10 +1,12 @@
 package io.livekit.android.example.voiceassistant
 
-// TODO: Add your Sandbox ID here
-const val sandboxID = "dowhistleai-2gkx96"
+// Sandbox ID must be empty to use the hardcoded URL and Token below.
+const val sandboxID = ""
 
-// NOTE: If you prefer not to use LiveKit Sandboxes for testing, you can generate your
-// tokens manually by visiting https://cloud.livekit.io/projects/p_/settings/keys
-// and using one of your API Keys to generate a token with custom TTL and permissions.
-const val hardcodedUrl = ""
-const val hardcodedToken = ""
+// These values point to your LiveKit server.
+const val hardcodedUrl = "wss://marvel-ydp1lqmi.livekit.cloud"
+
+// Token for the Android user.
+// NOTE: Ensure the identity in this token is DIFFERENT from your backend script's identity.
+// If both are "test_user", one will be disconnected.
+const val hardcodedToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQ5NTE0MTUsImlkZW50aXR5IjoidGVzdF91c2VyIiwiaXNzIjoiQVBJUzYzQURWNlFIa0FCIiwibmFtZSI6InRlc3RfdXNlciIsIm5iZiI6MTc2NDg2NTAxNSwic3ViIjoidGVzdF91c2VyIiwidmlkZW8iOnsicm9vbSI6InRlc3Rfcm9vbSIsInJvb21Kb2luIjp0cnVlfX0.tCV12ySKz1BxaYHJjnXyBfFaQNdApjJ6ydAT2dRYHmA"

@@ -25,7 +25,7 @@ async def main():
             print(f"Error processing data: {e}")
 
     # Replace with your URL and Token
-    await room.connect("wss://marvel-ydp1lqmi.livekit.cloud", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQ3Njk2NDUsImlkZW50aXR5IjoidGVzdF91c2VyIiwiaXNzIjoiQVBJUzYzQURWNlFIa0FCIiwibmFtZSI6InRlc3RfdXNlciIsIm5iZiI6MTc2NDY4MzI0NSwic3ViIjoidGVzdF91c2VyIiwidmlkZW8iOnsicm9vbSI6InRlc3Rfcm9vbSIsInJvb21Kb2luIjp0cnVlfX0.KsfORRoBjC02qGWHslAdqEzLQWEzitquHDRdCThgcV4")
+    await room.connect("wss://marvel-ydp1lqmi.livekit.cloud", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjQ5NDYyMzIsImlkZW50aXR5IjoidGVzdF91c2VyIiwiaXNzIjoiQVBJUzYzQURWNlFIa0FCIiwibmFtZSI6InRlc3RfdXNlciIsIm5iZiI6MTc2NDg1OTgzMiwic3ViIjoidGVzdF91c2VyIiwidmlkZW8iOnsicm9vbSI6InRlc3Rfcm9vbSIsInJvb21Kb2luIjp0cnVlfX0.ecelyN7C8WfiJHFOPyBZfEdYONtVLymr0oc5TzNN1UQ")
     print("Connected to room. Waiting for location updates...")
     
     # Keep the connection alive
