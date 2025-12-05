@@ -2,8 +2,10 @@ package io.livekit.android.example.voiceassistant.screen
 
 import android.app.Activity
 import android.content.Context.MEDIA_PROJECTION_SERVICE
+import android.content.Intent
 import android.location.Location
 import android.media.projection.MediaProjectionManager
+import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,7 +49,11 @@ import androidx.constraintlayout.compose.Dimension
 import androidx.constraintlayout.compose.Visibility
 import androidx.constraintlayout.compose.layoutId
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import io.livekit.android.annotations.Beta
 import io.livekit.android.compose.local.SessionScope
 import io.livekit.android.compose.local.requireRoom
@@ -57,6 +63,7 @@ import io.livekit.android.compose.state.rememberLocalMedia
 import io.livekit.android.compose.state.rememberSession
 import io.livekit.android.compose.state.rememberSessionMessages
 import io.livekit.android.compose.ui.VideoTrackView
+import io.livekit.android.example.voiceassistant.LocationService
 import io.livekit.android.example.voiceassistant.rememberCanAccessLocation
 import io.livekit.android.example.voiceassistant.rememberCanEnableCamera
 import io.livekit.android.example.voiceassistant.rememberCanEnableMic
@@ -115,24 +122,41 @@ fun VoiceAssistant(
 
     val context = LocalContext.current
 
-    // Fetch Location
-    var locationText by remember { mutableStateOf("Fetching location...") }
+    // Start LocationService when permission is granted
     LaunchedEffect(canAccessLocation) {
         if (canAccessLocation) {
-            try {
-                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
-                fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                    if (location != null) {
-                        locationText = "Lat: ${location.latitude}, Lon: ${location.longitude}"
-                    } else {
-                        locationText = "Location unavailable"
-                    }
+            val intent = Intent(context, LocationService::class.java)
+            context.startService(intent)
+        }
+    }
+
+    // Fetch and Display Real-time Location
+    var locationText by remember { mutableStateOf("Waiting for location...") }
+    
+    DisposableEffect(canAccessLocation) {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        val locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.lastLocation?.let { location ->
+                    locationText = "Lat: ${location.latitude}\nLon: ${location.longitude}"
                 }
+            }
+        }
+
+        if (canAccessLocation) {
+            try {
+                val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
+                    .setMinUpdateIntervalMillis(2000)
+                    .build()
+                
+                fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
             } catch (e: SecurityException) {
                 locationText = "Permission denied"
             }
-        } else {
-             locationText = "Location permission needed"
+        }
+
+        onDispose {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
         }
     }
 
@@ -158,6 +182,8 @@ fun VoiceAssistant(
         DisposableEffect(Unit) {
             onDispose {
                 session.end()
+                val intent = Intent(context, LocationService::class.java)
+                context.stopService(intent)
             }
         }
 

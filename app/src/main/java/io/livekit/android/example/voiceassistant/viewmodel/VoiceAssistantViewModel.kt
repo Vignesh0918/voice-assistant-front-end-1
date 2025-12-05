@@ -6,6 +6,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.toRoute
 import io.livekit.android.LiveKit
 import io.livekit.android.example.voiceassistant.screen.VoiceAssistantRoute
+import io.livekit.android.room.Room
 import io.livekit.android.token.TokenSource
 import io.livekit.android.token.cached
 
@@ -15,11 +16,11 @@ import io.livekit.android.token.cached
  */
 class VoiceAssistantViewModel(application: Application, savedStateHandle: SavedStateHandle) : AndroidViewModel(application) {
 
-    val room = LiveKit.create(application)
-
+    val room: Room = LiveKit.create(application)
     val tokenSource: TokenSource
 
     init {
+        activeRoom = room
         val (sandboxId, url, token) = savedStateHandle.toRoute<VoiceAssistantRoute>()
 
         tokenSource = if (sandboxId.isNotEmpty()) {
@@ -33,5 +34,10 @@ class VoiceAssistantViewModel(application: Application, savedStateHandle: SavedS
         super.onCleared()
         room.disconnect()
         room.release()
+        activeRoom = null
+    }
+
+    companion object {
+        var activeRoom: Room? = null
     }
 }
