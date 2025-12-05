@@ -1,7 +1,7 @@
 package io.livekit.android.example.voiceassistant
 
 // Sandbox ID MUST be empty to use your hardcoded server URL.
-const val sandboxID = ""
+const val sandboxID = "sandbox dowhistleai-2gkx96"
 
 // These values point to your LiveKit server.
 const val hardcodedUrl = "wss://marvel-ydp1lqmi.livekit.cloud"
