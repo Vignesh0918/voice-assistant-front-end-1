@@ -49,7 +49,7 @@ class LocationService : Service() {
                     val latitude = location.latitude
                     val longitude = location.longitude
                     
-                    val message = "{\"lat\":$latitude, \"lng\":$longitude}"
+                    val message = "{\"user_location\": {\"latitude\": $latitude, \"longitude\": $longitude}}"
                     sendLocationToLiveKit(message)
                 }
             }
