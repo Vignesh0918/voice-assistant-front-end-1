@@ -110,9 +110,12 @@ class LocationService : Service() {
                     Log.d(TAG, "Location received: $latitude, $longitude")
                     
                     // Format appropriately for LiveKit using JSON
+                    val userLocation = JSONObject()
+                    userLocation.put("latitude", latitude)
+                    userLocation.put("longitude", longitude)
+                    
                     val jsonObject = JSONObject()
-                    jsonObject.put("lat", latitude)
-                    jsonObject.put("lng", longitude)
+                    jsonObject.put("user_location", userLocation)
                     
                     sendLocationToLiveKit(jsonObject.toString())
                 }
