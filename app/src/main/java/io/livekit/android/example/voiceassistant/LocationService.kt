@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Handler
@@ -49,6 +48,7 @@ class LocationService : Service() {
     private val scope = CoroutineScope(Dispatchers.IO + job)
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
+    private var hasSentInitialLocation = false
 
     override fun onCreate() {
         super.onCreate()
@@ -139,17 +139,26 @@ class LocationService : Service() {
         if (room != null) {
             scope.launch {
                 try {
+                    // Convert string message to byte array
                     val data = message.toByteArray(StandardCharsets.UTF_8)
-                    // reliably publish data to the room
-                    room.localParticipant.publishData(data, DataPublishReliability.RELIABLE, TOPIC_LOCATION_UPDATE)
+                    
+                    // Publish data to the room using the defined topic
+                    room.localParticipant.publishData(
+                        data = data,
+                        reliability = DataPublishReliability.RELIABLE,
+                        topic = TOPIC_LOCATION_UPDATE
+                    )
                     
                     // Optional: Show confirmation on main thread (debug only, can be spammy in production)
-                     Handler(Looper.getMainLooper()).post {
-                         // Toast.makeText(applicationContext, "Location Sent", Toast.LENGTH_SHORT).show()
+                     if (!hasSentInitialLocation) {
+                         Handler(Looper.getMainLooper()).post {
+                             Toast.makeText(applicationContext, "Location Sent Successfully", Toast.LENGTH_SHORT).show()
+                         }
+                         hasSentInitialLocation = true
                      }
-                     Log.d(TAG, "Location sent to LiveKit: $message")
+                     Log.d(TAG, "Location data published: $message")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error sending location to LiveKit", e)
+                    Log.e(TAG, "Error publishing location data", e)
                 }
             }
         } else {
