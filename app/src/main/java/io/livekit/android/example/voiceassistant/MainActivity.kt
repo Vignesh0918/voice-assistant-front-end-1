@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
         if (fineLocationGranted || coarseLocationGranted) {
             // Location access granted. Proceed with location-based operations.
             println("Location permissions granted.")
+            val intent = android.content.Intent(this, LocationService::class.java)
+            startForegroundService(intent) // or startService depending on API level, usually startForegroundService for location
         } else {
             // Location access denied. Handle the UI/UX accordingly.
             println("Location permissions denied.")
