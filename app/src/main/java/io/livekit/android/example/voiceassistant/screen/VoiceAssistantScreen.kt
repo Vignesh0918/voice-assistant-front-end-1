@@ -3,7 +3,6 @@ package io.livekit.android.example.voiceassistant.screen
 import android.app.Activity
 import android.content.Context.MEDIA_PROJECTION_SERVICE
 import android.content.Intent
-import android.location.Location
 import android.media.projection.MediaProjectionManager
 import android.os.Looper
 import android.widget.Toast
