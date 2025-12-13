@@ -1,5 +1,8 @@
 package io.livekit.android.example.voiceassistant.screen
 
+import android.Manifest
+import android.content.Intent
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,6 +20,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -37,6 +42,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import io.livekit.android.example.voiceassistant.LocationService
 import io.livekit.android.example.voiceassistant.R
 import io.livekit.android.example.voiceassistant.hardcodedToken
 import io.livekit.android.example.voiceassistant.hardcodedUrl
@@ -47,10 +55,38 @@ import kotlinx.serialization.Serializable
 @Serializable
 object ConnectRoute
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun ConnectScreen(
     navigateToVoiceAssistant: (VoiceAssistantRoute) -> Unit
 ) {
+    val context = LocalContext.current
+    
+    // Request location permissions
+    val locationPermissionsState = rememberMultiplePermissionsState(
+        listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+    )
+    
+    // Request permissions when the screen is first displayed
+    LaunchedEffect(Unit) {
+        if (!locationPermissionsState.allPermissionsGranted) {
+            locationPermissionsState.launchMultiplePermissionRequest()
+        }
+    }
+    
+    // Start LocationService when permissions are granted
+    LaunchedEffect(locationPermissionsState.allPermissionsGranted) {
+        if (locationPermissionsState.allPermissionsGranted) {
+            Log.d("ConnectScreen", "Location permissions granted, starting LocationService")
+            val intent = Intent(context, LocationService::class.java)
+            context.startForegroundService(intent)
+        } else {
+            Log.w("ConnectScreen", "Location permissions not granted")
+        }
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier

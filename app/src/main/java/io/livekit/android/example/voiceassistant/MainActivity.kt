@@ -1,10 +1,8 @@
 package io.livekit.android.example.voiceassistant
 
-import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -24,31 +22,9 @@ import io.livekit.android.util.LoggingLevel
 
 class MainActivity : ComponentActivity() {
 
-    // 1. Declare the permission launcher
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // Handle permission results here
-        val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
-        val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
-
-        if (fineLocationGranted || coarseLocationGranted) {
-            // Location access granted. Proceed with location-based operations.
-            println("Location permissions granted.")
-            val intent = android.content.Intent(this, LocationService::class.java)
-            startForegroundService(intent) // or startService depending on API level, usually startForegroundService for location
-        } else {
-            // Location access denied. Handle the UI/UX accordingly.
-            println("Location permissions denied.")
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LiveKit.loggingLevel = LoggingLevel.DEBUG
-
-        // 2. Request the permissions
-        requestLocationPermissions()
 
         setContent {
             val navController = rememberNavController()
@@ -80,15 +56,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    // 3. Helper function to request permissions
-    private fun requestLocationPermissions() {
-        requestPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
     }
 }
