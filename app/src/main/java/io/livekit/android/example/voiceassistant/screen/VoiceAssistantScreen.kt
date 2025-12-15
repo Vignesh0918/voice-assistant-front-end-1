@@ -21,12 +21,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +79,8 @@ import io.livekit.android.room.track.screencapture.ScreenCaptureParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.json.JSONObject
+import android.util.Log
 
 @Serializable
 data class VoiceAssistantRoute(
@@ -188,6 +193,48 @@ fun VoiceAssistant(
 
         val room = requireRoom()
         var chatVisible by remember { mutableStateOf(false) }
+        
+        // Observe search results from ViewModel
+        val searchResultsJson by viewModel.searchResults.collectAsState()
+        var showResultsDialog by remember { mutableStateOf(false) }
+        var dialogMessage by remember { mutableStateOf("") }
+        
+        // Show dialog when results are received
+        LaunchedEffect(searchResultsJson) {
+            if (searchResultsJson != null) {
+                Log.d("VoiceAssistantScreen", "Search results received in UI - showing dialog")
+                try {
+                    val json = JSONObject(searchResultsJson)
+                    val results = json.getJSONArray("results")
+                    val resultCount = results.length()
+                    
+                    val messageBuilder = StringBuilder()
+                    messageBuilder.append("Received $resultCount result(s) from backend:\n\n")
+                    
+                    for (i in 0 until results.length()) {
+                        val result = results.getJSONObject(i)
+                        val businessName = result.optString("business_name", "N/A")
+                        val location = result.optJSONArray("location")
+                        
+                        messageBuilder.append("${i + 1}. $businessName")
+                        if (location != null && location.length() >= 2) {
+                            val lat = location.getDouble(1)
+                            val lon = location.getDouble(0)
+                            messageBuilder.append("\n   Location: Lat=$lat, Lon=$lon")
+                        }
+                        messageBuilder.append("\n\n")
+                    }
+                    
+                    dialogMessage = messageBuilder.toString()
+                    showResultsDialog = true
+                    Log.d("VoiceAssistantScreen", "Dialog message prepared and dialog set to show")
+                } catch (e: Exception) {
+                    Log.e("VoiceAssistantScreen", "Error formatting dialog message", e)
+                    dialogMessage = "Received results from backend:\n\n$searchResultsJson"
+                    showResultsDialog = true
+                }
+            }
+        }
 
         // LocalMedia provides state information about the user's local devices
         val localMedia = rememberLocalMedia()
@@ -348,6 +395,32 @@ fun VoiceAssistant(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+        }
+        
+        // AlertDialog to show search results
+        if (showResultsDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    Log.d("VoiceAssistantScreen", "Results dialog dismissed")
+                    showResultsDialog = false
+                },
+                title = {
+                    Text("Search Results Received")
+                },
+                text = {
+                    Text(dialogMessage)
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            Log.d("VoiceAssistantScreen", "OK button clicked in results dialog")
+                            showResultsDialog = false
+                        }
+                    ) {
+                        Text("OK")
+                    }
+                }
+            )
         }
     }
 }
