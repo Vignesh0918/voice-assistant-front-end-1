@@ -73,6 +73,8 @@ import io.livekit.android.example.voiceassistant.requirePermissions
 import io.livekit.android.example.voiceassistant.ui.AgentVisualization
 import io.livekit.android.example.voiceassistant.ui.ChatBar
 import io.livekit.android.example.voiceassistant.ui.ChatLog
+import io.livekit.android.example.voiceassistant.ui.ConnectionStatusIndicator
+import io.livekit.android.example.voiceassistant.ui.ConnectionStatus
 import io.livekit.android.example.voiceassistant.ui.ControlBar
 import io.livekit.android.example.voiceassistant.viewmodel.VoiceAssistantViewModel
 import io.livekit.android.room.track.screencapture.ScreenCaptureParams
@@ -166,19 +168,44 @@ fun VoiceAssistant(
 
     SessionScope(session = session) { session ->
 
+        // Track connection status
+        var connectionStatus by remember { mutableStateOf(ConnectionStatus.CONNECTING) }
+        var isSessionConnected by remember { mutableStateOf(false) }
+        
         // Start the session when we have at least microphone permissions.
         // Permission removals kill the app, so this is a one-way transition.
         LaunchedEffect(canEnableMic) {
             if (!canEnableMic) {
+                connectionStatus = ConnectionStatus.DISCONNECTED
                 return@LaunchedEffect
             }
 
+            connectionStatus = ConnectionStatus.CONNECTING
+            Log.d("VoiceAssistantScreen", "Starting voice assistant session...")
+            
             val result = session.start()
 
             // Handle if the session fails to connect.
             if (result.isFailure) {
+                Log.e("VoiceAssistantScreen", "Failed to connect to session", result.exceptionOrNull())
+                connectionStatus = ConnectionStatus.DISCONNECTED
                 Toast.makeText(context, "Error connecting to the session.", Toast.LENGTH_SHORT).show()
                 onEndCall()
+            } else {
+                Log.d("VoiceAssistantScreen", "Session started successfully")
+            }
+        }
+        
+        // Monitor session connection state - optimized to reduce lag
+        LaunchedEffect(session) {
+            try {
+                session.waitUntilConnected()
+                isSessionConnected = true
+                connectionStatus = if (isMicEnabled) ConnectionStatus.LISTENING else ConnectionStatus.CONNECTED
+                Log.d("VoiceAssistantScreen", "Session connected to voice assistant - Status: $connectionStatus")
+            } catch (e: Exception) {
+                Log.e("VoiceAssistantScreen", "Error waiting for connection", e)
+                connectionStatus = ConnectionStatus.DISCONNECTED
             }
         }
 
@@ -244,7 +271,26 @@ fun VoiceAssistant(
 
         LaunchedEffect(canEnableMic, requestedAudio) {
             session.waitUntilConnected()
+            isSessionConnected = true
             localMedia.setMicrophoneEnabled(canEnableMic && requestedAudio)
+            if (canEnableMic && requestedAudio) {
+                connectionStatus = ConnectionStatus.LISTENING
+                Log.d("VoiceAssistantScreen", "Microphone enabled - Voice assistant is listening")
+            } else {
+                connectionStatus = ConnectionStatus.CONNECTED
+                Log.d("VoiceAssistantScreen", "Microphone disabled")
+            }
+        }
+        
+        // Update connection status based on mic state
+        LaunchedEffect(isMicEnabled, isSessionConnected) {
+            if (isSessionConnected) {
+                if (isMicEnabled) {
+                    connectionStatus = ConnectionStatus.LISTENING
+                } else {
+                    connectionStatus = ConnectionStatus.CONNECTED
+                }
+            }
         }
 
         LaunchedEffect(canEnableVideo, requestedVideo) {
@@ -395,6 +441,12 @@ fun VoiceAssistant(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
+            
+            // Connection Status Indicator
+            ConnectionStatusIndicator(
+                status = connectionStatus,
+                modifier = Modifier.layoutId(LAYOUT_ID_CONNECTION_STATUS)
+            )
         }
         
         // AlertDialog to show search results
@@ -433,21 +485,29 @@ private const val LAYOUT_ID_CHAT_BAR = "chatBar"
 private const val LAYOUT_ID_CAMERA = "camera"
 private const val LAYOUT_ID_SCREENSHARE = "screenshare"
 private const val LAYOUT_ID_LOCATION = "location"
+private const val LAYOUT_ID_CONNECTION_STATUS = "connectionStatus"
 
 private fun getConstraints(chatVisible: Boolean, cameraVisible: Boolean, screenShareVisible: Boolean) = ConstraintSet {
-    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare, locationBox) = createRefsFor(
+    val (agentVisualizer, chatLog, controlBar, chatBar, camera, screenShare, locationBox, connectionStatus) = createRefsFor(
         LAYOUT_ID_AGENT,
         LAYOUT_ID_CHAT_LOG,
         LAYOUT_ID_CONTROL_BAR,
         LAYOUT_ID_CHAT_BAR,
         LAYOUT_ID_CAMERA,
         LAYOUT_ID_SCREENSHARE,
-        LAYOUT_ID_LOCATION
+        LAYOUT_ID_LOCATION,
+        LAYOUT_ID_CONNECTION_STATUS
     )
     val chatTopGuideline = createGuidelineFromTop(0.2f)
 
     constrain(locationBox) {
         top.linkTo(parent.top)
+        start.linkTo(parent.start)
+        end.linkTo(parent.end)
+    }
+    
+    constrain(connectionStatus) {
+        top.linkTo(locationBox.bottom, 8.dp)
         start.linkTo(parent.start)
         end.linkTo(parent.end)
     }

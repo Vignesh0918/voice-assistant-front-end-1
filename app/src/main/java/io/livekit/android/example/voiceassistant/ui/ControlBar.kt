@@ -30,8 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.Build
 import io.livekit.android.annotations.Beta
 import io.livekit.android.compose.types.TrackReference
 import io.livekit.android.compose.ui.audio.AudioBarVisualizer
@@ -81,10 +85,24 @@ fun ControlBar(
             Icons.Default.MicOff
         }
 
+        val context = LocalContext.current
+        
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .clickable(onClick = onMicClick)
+                .clickable(onClick = {
+                    // Haptic feedback for better UX
+                    val vibrator = context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator
+                    vibrator?.let {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            it.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                        } else {
+                            @Suppress("DEPRECATION")
+                            it.vibrate(50)
+                        }
+                    }
+                    onMicClick()
+                })
                 .height(48.dp)
                 .weight(1f)
                 .enabledButtonModifier(isMicEnabled)
